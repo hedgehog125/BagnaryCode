@@ -1,0 +1,47 @@
+Equivalent to
+if (<constant condition>) {
+    RAM[96] = 1;
+}
+
+Load a 1 into the accumulator
+0001
+0101 1111
+A 0 would be 0101 1110
+111
+
+Conditional jump to
+0010
+The address to jump to if the accumulator bit is 1
+0011 1100
+111
+Else
+    Make the conditional jump always happen, load a 1 into the accumulator
+    0001
+    0101 1111
+    111
+
+    Jump to exit the "if else" statement
+    0010
+    0101 1010
+    111
+    Don't need an else because this will always be true
+If the condition is true
+    Write a 1 to RAM
+
+    Load a 1 into the accumulator
+    0001
+    0101 1111
+    111
+
+    Write it to RAM
+    0011
+    0110 0000
+    111
+
+Stop the program
+0000
+
+Values
+01
+Output
+0

@@ -1,0 +1,27 @@
+Load a 1 into the accumulator
+0001
+0010 0010
+111
+
+Write a 1 to RAM
+0011
+0010 0011
+111
+
+End
+0000
+
+Values
+1
+Output value
+0
+
+
+.Load
+.0001
+.0001 0000
+
+.Stop
+.0000
+.Values
+.0010 1010
