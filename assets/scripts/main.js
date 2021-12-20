@@ -1,5 +1,12 @@
+/*
+TODO
+
+More instruction sets
+1.0 instruction set variation with 16 bit memory addresses
+*/
+
 const config = {
-    RAMAmount: 128 * 8,
+    RAMAmount: 256,
     clockSpeed: 1,
     instructionSetVersion: 1,
     display: {
@@ -192,7 +199,28 @@ let game = Bagel.init({
                 }
             }
         },
-        executionTick: 0
+        executionTick: 0,
+        flashWarningLevel: 0,
+        flashWarningIfNeeded: showing => {
+            let level = game.vars.flashWarningLevel;
+            if (level == 0) {
+                return true;
+            }
+            else if (level == 1) {
+                game.input.mouse.down = false;
+                if (showing) {
+                    return confirm("This may produce slight flashes in the debug display at this clock speed. Continue?");
+                }
+                return confirm("This may produce slight flashes in the debug display. Continue?");
+            }
+            else {
+                game.input.mouse.down = false;
+                if (showing) {
+                    return confirm("This will produce many flashes in the debug display at this clock speed. Continue?");
+                }
+                return confirm("This will produce many flashes in the debug display. Continue?");
+            }
+        }
     },
     game: {
         scripts: {
@@ -322,7 +350,19 @@ let game = Bagel.init({
                                             alert("That's not a number.");
                                         }
                                         else {
-                                            config.clockSpeed = input;
+                                            let flashiness = 0;
+                                            if (input >= 17) {
+                                                if (input >= 30) {
+                                                    flashiness = 2;
+                                                }
+                                                else {
+                                                    flashiness = 1;
+                                                }
+                                            }
+                                            game.vars.flashWarningLevel = flashiness;
+                                            if (game.vars.flashWarningIfNeeded()) {
+                                                config.clockSpeed = input;
+                                            }
                                         }
                                     }
                                 },
@@ -413,13 +453,15 @@ let game = Bagel.init({
                                         element.onHover = "Show the debug displays";
                                     }
                                     else {
-                                        game.get.sprite("RAM_Display").visible = true;
-                                        game.get.sprite("MemoryHistoryTitle").visible = true;
-                                        game.get.sprite("MemoryHistory").visible = true;
-                                        game.get.sprite("OtherDebugInfo").visible = true;
+                                        if (game.vars.flashWarningIfNeeded(true)) {
+                                            game.get.sprite("RAM_Display").visible = true;
+                                            game.get.sprite("MemoryHistoryTitle").visible = true;
+                                            game.get.sprite("MemoryHistory").visible = true;
+                                            game.get.sprite("OtherDebugInfo").visible = true;
 
-                                        iconSprite.img = "Visible";
-                                        element.onHover = "Hide the debug displays";
+                                            iconSprite.img = "Visible";
+                                            element.onHover = "Hide the debug displays";
+                                        }
                                     }
                                 },
                                 onHover: "Hide the debug displays",
