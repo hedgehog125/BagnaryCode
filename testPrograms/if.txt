@@ -1,6 +1,6 @@
 Equivalent to
 if (<constant condition>) {
-    RAM[96] = 1;
+    RAM[96] = "1";
 }
 
 Load a 1 into the accumulator

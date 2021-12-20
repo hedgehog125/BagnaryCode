@@ -37,7 +37,8 @@ let game = Bagel.init({
                     register.programCounter += 8 + 3; // The next instruction is actually a value, which is double the length of an instruction code and skip over the bit number
                 },
                 "0010": (executionVars, register) => { // Conditional jump to else continue
-                    if (register.accumulator[7] == "0") {
+                    let bitID = executionVars.binaryToDenary(executionVars.state.RAM.slice(register.programCounter + 12, register.programCounter + 15));
+                    if (register.accumulator[bitID] == "0") {
                         register.programCounter += 8 + 3; // Skip over the value that stores the conditional jump to adddress
                     }
                     else {
@@ -133,14 +134,14 @@ let game = Bagel.init({
                 game.vars.execution.state.running = true;
                 game.vars.executionTick = 1;
 
-                let pauseButton = game.game.sprites[11];
+                let pauseButton = game.game.sprites[15];
                 let pauseElement = pauseButton.vars.element;
                 pauseElement.onClick(pauseElement, pauseButton, true);
             },
             pauseExecution: _ => {
                 game.vars.execution.state.running = false;
 
-                let pauseButton = game.game.sprites[11];
+                let pauseButton = game.game.sprites[15];
                 let pauseElement = pauseButton.vars.element;
                 pauseElement.onClick(pauseElement, pauseButton, true);
             },
@@ -302,6 +303,7 @@ let game = Bagel.init({
                                         })
                                         */
                                     });
+                                    game.input.mouse.down = false;
                                 },
                                 onHover: "Upload a program to emulate",
                                 color: "yellow",
@@ -313,6 +315,7 @@ let game = Bagel.init({
                                 type: "button",
                                 onClick: _ => {
                                     let input = prompt("Enter the new clock speed...", config.clockSpeed);
+                                    game.input.mouse.down = false;
                                     if (input != null) {
                                         input = parseFloat(input);
                                         if (isNaN(input)) {
@@ -335,6 +338,7 @@ let game = Bagel.init({
                                 type: "button",
                                 onClick: _ => {
                                     let input = prompt("Enter the new amount of RAM... (in bytes)", config.RAMAmount / 8);
+                                    game.input.mouse.down = false;
                                     if (input != null) {
                                         input = parseFloat(input);
                                         if (isNaN(input)) {
@@ -348,6 +352,7 @@ let game = Bagel.init({
                                                     if (! confirm("Are you sure you want to reduce the RAM this CPU has? This is likely to cause issues if you don't know where the program ends in memory.")) {
                                                         resize = false;
                                                     }
+                                                    game.input.mouse.down = false;
                                                 }
                                             }
 
@@ -383,7 +388,7 @@ let game = Bagel.init({
                             },
                             {
                                 type: "button",
-                                onClick: _ => {
+                                onClick: (element, sprite) => {
                                     config.display.RAMByteMode = ! config.display.RAMByteMode;
                                 },
                                 onHover: "Swap between displaying the RAM as bits and bytes",
@@ -394,6 +399,38 @@ let game = Bagel.init({
                                 iconSize: 0.8,
                                 size: 50
                             },
+                            {
+                                type: "button",
+                                onClick: (element, sprite) => {
+                                    let iconSprite = sprite.vars.linkedElements[1];
+                                    if (iconSprite.img == "Visible") {
+                                        game.get.sprite("RAM_Display").visible = false;
+                                        game.get.sprite("MemoryHistoryTitle").visible = false;
+                                        game.get.sprite("MemoryHistory").visible = false;
+                                        game.get.sprite("OtherDebugInfo").visible = false;
+
+                                        iconSprite.img = "Invisible";
+                                        element.onHover = "Show the debug displays";
+                                    }
+                                    else {
+                                        game.get.sprite("RAM_Display").visible = true;
+                                        game.get.sprite("MemoryHistoryTitle").visible = true;
+                                        game.get.sprite("MemoryHistory").visible = true;
+                                        game.get.sprite("OtherDebugInfo").visible = true;
+
+                                        iconSprite.img = "Visible";
+                                        element.onHover = "Hide the debug displays";
+                                    }
+                                },
+                                onHover: "Hide the debug displays",
+                                color: "yellow",
+                                icon: "Visible",
+                                right: 740,
+                                top: 205,
+                                iconSize: 0.8,
+                                size: 50
+                            },
+
                             {
                                 type: "button",
                                 onClick: (element, sprite, external) => {
@@ -437,37 +474,6 @@ let game = Bagel.init({
                                 bottom: 449 - 25,
                                 iconSize: 0.8,
                                 size: 75
-                            },
-                            {
-                                type: "button",
-                                onClick: (element, sprite) => {
-                                    let iconSprite = sprite.vars.linkedElements[1];
-                                    if (iconSprite.img == "Visible") {
-                                        game.get.sprite("RAM_Display").visible = false;
-                                        game.get.sprite("MemoryHistoryTitle").visible = false;
-                                        game.get.sprite("MemoryHistory").visible = false;
-                                        game.get.sprite("OtherDebugInfo").visible = false;
-
-                                        iconSprite.img = "Invisible";
-                                        element.onHover = "Show the debug displays";
-                                    }
-                                    else {
-                                        game.get.sprite("RAM_Display").visible = true;
-                                        game.get.sprite("MemoryHistoryTitle").visible = true;
-                                        game.get.sprite("MemoryHistory").visible = true;
-                                        game.get.sprite("OtherDebugInfo").visible = true;
-
-                                        iconSprite.img = "Visible";
-                                        element.onHover = "Hide the debug displays";
-                                    }
-                                },
-                                onHover: "Hide the debug displays",
-                                color: "yellow",
-                                icon: "Visible",
-                                right: 740,
-                                top: 205,
-                                iconSize: 0.8,
-                                size: 50
                             }
                         ]
                     }
@@ -511,7 +517,7 @@ let game = Bagel.init({
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
                     let ram = game.vars.execution.state.RAM;
-                    if (config.display.RAMByteMode) {
+                    if (me.vars.byteMode) {
                         let i = 0;
                         while (i < ram.length) {
                             let value = game.vars.execution.binaryToDenary(ram.slice(i, i + 8));
@@ -630,7 +636,7 @@ let game = Bagel.init({
                         }
                     ]
                 }
-            },
+            }
         ]
     },
     width: 800,

@@ -1,0 +1,48 @@
+Equivalent to
+while (true) {
+    RAM[] = ! RAM[];
+}
+
+Load a 1 into the accumulator to use for non-conditional jumps
+0001
+0110 1010
+001
+
+000 is left blank to be used as a 0 constant
+
+
+Load the current value into the accumulator
+0001
+0110 1011
+111
+
+Conditional jump
+0010
+0100 1011
+111
+Else
+    Set it to 1
+    0011
+    0110 1011
+    001
+
+    Non-conditional jump
+    0010
+    0000 1111
+    001
+
+If the value is 1
+    Set it to 0
+    0011
+    0110 1011
+    000
+
+    Non-conditional jump
+    0010
+    0000 1111
+    001
+
+Constants
+01
+Toggling pixel
+0
