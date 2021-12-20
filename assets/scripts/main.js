@@ -25,7 +25,7 @@ let game = Bagel.init({
             instructionCode: {
                 "0000": (executionVars, register) => { // Stop the program
                     executionVars.pauseExecution();
-                    register.programCounter -= 4;
+                    return true;
                 },
                 "0001": (executionVars, register) => { // Load address into the accumulator
                     let state = executionVars.state;
@@ -52,6 +52,24 @@ let game = Bagel.init({
                     let bitID = executionVars.binaryToDenary(state.RAM.slice(register.programCounter + 12, register.programCounter + 15));
                     executionVars.state.RAM[address] = register.accumulator[bitID];
                     register.programCounter += 8 + 3; // Skip over the value that stores the address and that stores the bit number
+                }
+            },
+            instructionInfo: { // Only used for the debug display
+                "0000": {
+                    name: "Stop",
+                    arguments: []
+                },
+                "0001": {
+                    name: "Load > Acc",
+                    arguments: [8, 3]
+                },
+                "0010": {
+                    name: "Jump if",
+                    arguments: [8, 3]
+                },
+                "0011": {
+                    name: "Write > RAM",
+                    arguments: [8, 3]
                 }
             },
             instructionSets: {
@@ -137,6 +155,36 @@ let game = Bagel.init({
                     state.running = false;
                     return;
                 }
+                // For debugging
+                let address = register.programCounter;
+                let line = address + ") ";
+                let instructionInfo = executionVars.instructionInfo[register.instruction];
+                line += instructionInfo.name;
+
+                address += 4;
+                for (let i in instructionInfo.arguments) {
+                    let length = instructionInfo.arguments[i];
+                    let value = state.RAM.slice(address, address + length);
+
+                    let c = 0;
+                    while (c < value.length) {
+                        if (c != 0 && c % 4 == 0) {
+                            value[c - 1] += " ";
+                        }
+                        c++;
+                    }
+
+                    line += " | " + value.join("");
+                    address += length;
+                }
+
+                let debugDisplay = game.get.sprite("MemoryHistory").vars;
+                let instructionHistory = debugDisplay.instructionHistory;
+                instructionHistory.push(line);
+                if (instructionHistory.length == debugDisplay.instructionHistoryLength + 1) {
+                    instructionHistory.splice(0, 1);
+                }
+
                 let output = code(executionVars, register);
                 if (! output) {
                     register.programCounter += 4;
@@ -195,6 +243,14 @@ let game = Bagel.init({
                 {
                     id: "Restart",
                     src: "assets/imgs/restart.png"
+                },
+                {
+                    id: "Visible",
+                    src: "assets/imgs/visible.png"
+                },
+                {
+                    id: "Invisible",
+                    src: "assets/imgs/invisible.png"
                 }
             ]
         },
@@ -381,6 +437,37 @@ let game = Bagel.init({
                                 bottom: 449 - 25,
                                 iconSize: 0.8,
                                 size: 75
+                            },
+                            {
+                                type: "button",
+                                onClick: (element, sprite) => {
+                                    let iconSprite = sprite.vars.linkedElements[1];
+                                    if (iconSprite.img == "Visible") {
+                                        game.get.sprite("RAM_Display").visible = false;
+                                        game.get.sprite("MemoryHistoryTitle").visible = false;
+                                        game.get.sprite("MemoryHistory").visible = false;
+                                        game.get.sprite("OtherDebugInfo").visible = false;
+
+                                        iconSprite.img = "Invisible";
+                                        element.onHover = "Show the debug displays";
+                                    }
+                                    else {
+                                        game.get.sprite("RAM_Display").visible = true;
+                                        game.get.sprite("MemoryHistoryTitle").visible = true;
+                                        game.get.sprite("MemoryHistory").visible = true;
+                                        game.get.sprite("OtherDebugInfo").visible = true;
+
+                                        iconSprite.img = "Visible";
+                                        element.onHover = "Hide the debug displays";
+                                    }
+                                },
+                                onHover: "Hide the debug displays",
+                                color: "yellow",
+                                icon: "Visible",
+                                right: 740,
+                                top: 205,
+                                iconSize: 0.8,
+                                size: 50
                             }
                         ]
                     }
@@ -459,7 +546,91 @@ let game = Bagel.init({
                 },
                 width: 1,
                 height: 1
-            }
+            },
+            {
+                type: "text",
+                text: "Instruction History:",
+                id: "MemoryHistoryTitle",
+                bitmap: true,
+                color: "#EFEFEF",
+                top: 260,
+                left: 599,
+                size: 9.7,
+                scripts: {
+                    init: [
+                        {
+                            code: null,
+                            stateToRun: "main"
+                        }
+                    ]
+                }
+            },
+            {
+                type: "text",
+                text: "",
+                id: "MemoryHistory",
+                bitmap: true,
+                color: "#EFEFEF",
+                wordWrapWidth: 200,
+                size: 6,
+                vars: {
+                    instructionHistory: [],
+                    instructionHistoryLength: 10,
+                    memoryHistory: []
+                },
+                scripts: {
+                    init: [
+                        {
+                            code: me => {
+                                me.vars.top = game.get.sprite("MemoryHistoryTitle").bottom + 5;
+                            },
+                            stateToRun: "main"
+                        }
+                    ],
+                    main: [
+                        {
+                            code: me => {
+                                me.text = me.vars.instructionHistory.join("\n");
+                                me.top = me.vars.top;
+                                me.left = 599;
+                            },
+                            stateToRun: "main"
+                        }
+                    ]
+                }
+            },
+            {
+                type: "text",
+                text: "Program counter:\nAccumulator:\n",
+                id: "OtherDebugInfo",
+                bitmap: true,
+                color: "#EFEFEF",
+                left: 599,
+                size: 9,
+                scripts: {
+                    init: [
+                        {
+                            code: null,
+                            stateToRun: "main"
+                        }
+                    ],
+                    main: [
+                        {
+                            code: me => {
+                                let register = game.vars.execution.state.register;
+                                let text = "Program counter: " + register.programCounter + "\n";
+                                text += "Accumulator: ";
+                                text += register.accumulator.slice(0, 4).join("") + " " + register.accumulator.slice(4).join("");
+
+                                me.text = text;
+                                me.top = 380;
+                                me.left = 599;
+                            },
+                            stateToRun: "main"
+                        }
+                    ]
+                }
+            },
         ]
     },
     width: 800,
