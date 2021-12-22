@@ -11,7 +11,9 @@ const config = {
     instructionSetVersion: 1,
     display: {
         RAMByteMode: false
-    }
+    },
+    instructionSet: null,
+    instructionSetName: null
 };
 
 let game = Bagel.init({
@@ -20,7 +22,7 @@ let game = Bagel.init({
     vars: {
         execution: {
             binaryToDenary: binary => {
-                let powers = [1, 2, 4, 8, 16, 32, 64, 128];
+                let powers = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768];
                 let total = 0;
                 for (let i in binary) {
                     if (binary[i] == "1") {
@@ -30,11 +32,13 @@ let game = Bagel.init({
                 return total;
             },
             instructionCode: {
-                "0000": (executionVars, register) => { // Stop the program
+                stop: (executionVars, register) => { // Stop the program
                     executionVars.pauseExecution();
                     return true;
                 },
-                "0001": (executionVars, register) => { // Load address into the accumulator
+
+                // V1
+                loadIntoAccumulator: (executionVars, register) => { // Load address into the accumulator
                     let state = executionVars.state;
                     let address = state.RAM.slice(register.programCounter + 4, register.programCounter + 12);
                     address = executionVars.binaryToDenary(address);
@@ -43,7 +47,7 @@ let game = Bagel.init({
                     register.accumulator[bitID] = state.RAM[address];
                     register.programCounter += 8 + 3; // The next instruction is actually a value, which is double the length of an instruction code and skip over the bit number
                 },
-                "0010": (executionVars, register) => { // Conditional jump to else continue
+                conditionalJumpToElse: (executionVars, register) => { // Conditional jump to else continue
                     let bitID = executionVars.binaryToDenary(executionVars.state.RAM.slice(register.programCounter + 12, register.programCounter + 15));
                     if (register.accumulator[bitID] == "0") {
                         register.programCounter += 8 + 3; // Skip over the value that stores the conditional jump to adddress
@@ -54,36 +58,97 @@ let game = Bagel.init({
                         return true;
                     }
                 },
-                "0011": (executionVars, register) => { // Write accumulator bit to RAM
+                writeAccumulatorBitRAM: (executionVars, register) => { // Write accumulator bit to RAM
                     let state = executionVars.state;
                     let address = executionVars.binaryToDenary(state.RAM.slice(register.programCounter + 4, register.programCounter + 12));
                     let bitID = executionVars.binaryToDenary(state.RAM.slice(register.programCounter + 12, register.programCounter + 15));
                     executionVars.state.RAM[address] = register.accumulator[bitID];
                     register.programCounter += 8 + 3; // Skip over the value that stores the address and that stores the bit number
+                },
+
+                // V1.1
+                "loadIntoAccumulator1.1": (executionVars, register) => { // Load address into the accumulator
+                    let state = executionVars.state;
+                    let address = state.RAM.slice(register.programCounter + 2, register.programCounter + 18);
+                    address = executionVars.binaryToDenary(address);
+                    let bitID = executionVars.binaryToDenary(state.RAM.slice(register.programCounter + 19, register.programCounter + 23));
+
+                    register.accumulator[bitID] = state.RAM[address];
+                    register.programCounter += 16 + 4; // Skip over the values
+                },
+                "conditionalJumpToElse1.1": (executionVars, register) => { // Conditional jump to else continue
+                    let bitID = executionVars.binaryToDenary(state.RAM.slice(register.programCounter + 19, register.programCounter + 23));
+                    if (register.accumulator[bitID] == "0") {
+                        register.programCounter += 16 + 4; // Skip over the values
+                    }
+                    else {
+                        let value = executionVars.binaryToDenary(state.RAM.slice(register.programCounter + 2, register.programCounter + 18));
+                        register.programCounter = value;
+                        return true;
+                    }
+                },
+                "writeAccumulatorBitRAM1.1": (executionVars, register) => { // Write accumulator bit to RAM
+                    let state = executionVars.state;
+                    let address = executionVars.binaryToDenary(state.RAM.slice(register.programCounter + 2, register.programCounter + 18));
+                    let bitID = executionVars.binaryToDenary(state.RAM.slice(register.programCounter + 19, register.programCounter + 23));
+                    executionVars.state.RAM[address] = register.accumulator[bitID];
+                    register.programCounter += 16 + 4; // Skip over the value that stores the address and that stores the bit number
                 }
             },
             instructionInfo: { // Only used for the debug display
-                "0000": {
+                // V1.0
+                stop: {
                     name: "Stop",
                     arguments: []
                 },
-                "0001": {
+                loadIntoAccumulator: {
                     name: "Load > Acc",
                     arguments: [8, 3]
                 },
-                "0010": {
+                conditionalJumpToElse: {
                     name: "Jump if",
                     arguments: [8, 3]
                 },
-                "0011": {
+                writeAccumulatorBitRAM: {
                     name: "Write > RAM",
                     arguments: [8, 3]
+                },
+
+                // V1.1
+                "loadIntoAccumulator1.1": {
+                    name: "Load > Acc",
+                    arguments: [16, 4]
+                },
+                "conditionalJumpToElse1.1": {
+                    name: "Jump if",
+                    arguments: [16, 4]
+                },
+                "writeAccumulatorBitRAM1.1": {
+                    name: "Write > RAM",
+                    arguments: [16, 4]
                 }
             },
             instructionSets: {
-                1: [
-                    "0000"
-                ]
+                "1.0": {
+                    mappings: {
+                        "0000": "stop",
+                        "0001": "loadIntoAccumulator",
+                        "0010": "conditionalJumpToElse",
+                        "0011": "writeAccumulatorBitRAM"
+                    },
+                    instructionCodeLength: 4,
+                    accumulatorSize: 8
+                },
+                "1.1": {
+                    mappings: {
+                        "00": "stop",
+                        "01": "loadIntoAccumulator1.1",
+                        "10": "conditionalJumpToElse1.1",
+                        "11": "writeAccumulatorBitRAM1.1"
+                    },
+                    instructionCodeLength: 2,
+                    accumulatorSize: 16
+                }
             },
             state: {
                 running: false,
@@ -97,6 +162,24 @@ let game = Bagel.init({
             program: null,
 
             parseProgram: program => { // Do some really basic parsing to remove spaces and comments
+                // Find the instruction set specified in the file
+                let keyword = "#InstructionSet ";
+                let index = program.indexOf(keyword);
+                if (index == -1) {
+                    alert("No instruction set specified in program. Specify one by putting \"#InstructionSet <name>\" at the top of the program file.");
+                    return;
+                }
+                else {
+                    let name = program.slice(index + keyword.length, program.indexOf("\n", index + keyword.length));
+                    config.instructionSetName = name;
+                    config.instructionSet = game.vars.execution.instructionSets[name];
+                    if (config.instructionSet == null) {
+                        alert("Invalid instruction set of " + JSON.stringify(name) + ".");
+                        return;
+                    }
+                }
+
+
                 return program.split("\n").map(value => (
                     value.replaceAll(" ", "").replaceAll("  ", "")
                 )).filter(value => (
@@ -133,8 +216,8 @@ let game = Bagel.init({
             resetRegister: _ => {
                 game.vars.execution.state.register = {
                     programCounter: 0,
-                    instruction: "0".repeat(4),
-                    accumulator: new Array(8).fill("0")
+                    instruction: "0".repeat(config.instructionSet.instructionCodeLength),
+                    accumulator: new Array(config.instructionSet.accumulatorSize).fill("0")
                 };
             },
             beginExecution: _ => {
@@ -156,20 +239,28 @@ let game = Bagel.init({
                 let executionVars = game.vars.execution;
                 let state = executionVars.state;
                 let register = state.register;
-                register.instruction = state.RAM.slice(register.programCounter, register.programCounter + 4).join("");
-                let code = executionVars.instructionCode[register.instruction];
-                if (code == null) {
+                register.instruction = state.RAM.slice(register.programCounter, register.programCounter + config.instructionSet.instructionCodeLength).join("");
+
+                let instructionName = config.instructionSet.mappings[register.instruction];
+                if (instructionName == null) {
                     alert("Invalid instruction at address " + register.programCounter + ".");
                     state.running = false;
                     return;
                 }
+                let code = executionVars.instructionCode[instructionName];
+                if (code == null) {
+                    alert("Invalid instruction mapping for instruction set " + config.instructionSetName + " for code " + register.instruction + ".");
+                    state.running = false;
+                    return;
+                }
+
                 // For debugging
                 let address = register.programCounter;
                 let line = address + ") ";
-                let instructionInfo = executionVars.instructionInfo[register.instruction];
+                let instructionInfo = executionVars.instructionInfo[instructionName];
                 line += instructionInfo.name;
 
-                address += 4;
+                address += config.instructionSet.instructionCodeLength;
                 for (let i in instructionInfo.arguments) {
                     let length = instructionInfo.arguments[i];
                     let value = state.RAM.slice(address, address + length);
@@ -195,7 +286,7 @@ let game = Bagel.init({
 
                 let output = code(executionVars, register);
                 if (! output) {
-                    register.programCounter += 4;
+                    register.programCounter += config.instructionSet.instructionCodeLength;
                 }
             }
         },
@@ -652,6 +743,7 @@ let game = Bagel.init({
                 text: "Program counter:\nAccumulator:\n",
                 id: "OtherDebugInfo",
                 bitmap: true,
+                wordWrapWidth: 205,
                 color: "#EFEFEF",
                 left: 599,
                 size: 9,
@@ -668,7 +760,7 @@ let game = Bagel.init({
                                 let register = game.vars.execution.state.register;
                                 let text = "Program counter: " + register.programCounter + "\n";
                                 text += "Accumulator: ";
-                                text += register.accumulator.slice(0, 4).join("") + " " + register.accumulator.slice(4).join("");
+                                text += register.accumulator.map((value, index) => index != 0 && index % 4 == 0? " " + value : value).join("");
 
                                 me.text = text;
                                 me.top = 380;

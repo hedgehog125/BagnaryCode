@@ -1,3 +1,5 @@
+#InstructionSet 1.0
+
 Load a 1 into the accumulator
 0001
 0010 0010

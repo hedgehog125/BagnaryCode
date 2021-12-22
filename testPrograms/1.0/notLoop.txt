@@ -1,3 +1,5 @@
+#InstructionSet 1.0
+
 Equivalent to
 while (true) {
     RAM[] = ! RAM[];

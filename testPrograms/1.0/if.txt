@@ -1,3 +1,5 @@
+#InstructionSet 1.0
+
 Equivalent to
 if (<constant condition>) {
     RAM[96] = "1";
