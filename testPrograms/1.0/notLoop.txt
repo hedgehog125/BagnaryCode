@@ -2,7 +2,7 @@
 
 Equivalent to
 while (true) {
-    RAM[] = ! RAM[];
+    RAM[107] = ! RAM[107];
 }
 
 Load a 1 into the accumulator to use for non-conditional jumps

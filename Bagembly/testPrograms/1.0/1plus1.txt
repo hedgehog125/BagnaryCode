@@ -1,4 +1,5 @@
 #InstructionSet 1.1
+/*
 This first version only supports 2 bit numbers
 
 Equivilent to
@@ -34,10 +35,11 @@ while (i != -1) {
     }
     i--;
 }
+*/
 
 
-Load the first number into the accumulator (both binary digits)
-This is what will be the total
+// Load the first number into the accumulator (both binary digits)
+// This is what will be the total
 01
 0000 0000 0000 0000
 0000
