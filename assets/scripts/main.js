@@ -3,6 +3,7 @@ TODO
 
 More instruction sets
 1.0 instruction set variation with 16 bit memory addresses
+Fix error when pausing and reloading while no program is loaded
 */
 
 const config = {

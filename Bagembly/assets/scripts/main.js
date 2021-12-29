@@ -1,5 +1,8 @@
 /*
 TODO
+
+Raw binary support. Use special character?
+Parsing doesn't think the stuff at the end is invalid for some reason?
 */
 
 let game = (_ => {
@@ -103,6 +106,7 @@ let game = (_ => {
                 },
                 parseProgram: program => {
                     let parsed = {};
+
                     // Find the instruction set specified in the file
                     let keyword = "#InstructionSet ";
                     let index = program.indexOf(keyword);
@@ -125,15 +129,17 @@ let game = (_ => {
                             return;
                         }
                     }
+                    let instructionNames = parsed.instructionSet.used;
 
                     let lines = program.split("\n");
                     let commands = [];
                     let lineNumbers = [];
                     let inMultiComment = false;
+                    let commandName, commandInfo, argumentID;
+                    let command = [];
                     for (let i in lines) {
                         let line = lines[i];
                         let inCompileCommand = false;
-                        let command = [];
 
                         // Skip over whitespace
                         let c = 0;
@@ -176,44 +182,83 @@ let game = (_ => {
                             }
 
                             let endOfLine = c + 1 >= line.length;
-                            if (line[c] == " " || line[c] == "  " || endOfLine) {
-                                if (endOfLine && c + 1 == line.length) {
-                                    subCommand += line[c];
+                            if (commandName) {
+                                let argumentLength = commandInfo.arguments[argumentID];
+                                if (typeof argumentLength == "function") {
+                                    argumentLength = argumentLength(parsed.instructionSet);
                                 }
-                                if (subCommand.length != 0) {
-                                    command.push(subCommand);
-                                    subCommand = "";
+
+                                if (argumentLength == -1) { // Text. Unknown length
+                                    if (endOfLine) {
+                                        argumentID++;
+                                        if (argumentID == commandInfo.arguments.length) {
+                                            commandName = null;
+
+                                            command = [];
+                                            commands.push(command);
+                                            lineNumbers.push(parseInt(i));
+                                        }
+                                    }
+                                    else {
+                                        subCommand += line[c];
+                                    }
+                                }
+                                else {
+                                    if (line[c] != " " && line[c] != "  ") {
+                                        subCommand += line[c];
+                                    }
+                                    if (subCommand.length == argumentLength) {
+                                        command.push(subCommand);
+                                        subCommand = "";
+
+                                        argumentID++;
+                                        if (argumentID == commandInfo.arguments.length) {
+                                            commandName = null;
+
+                                            command = [];
+                                            commands.push(command);
+                                            lineNumbers.push(parseInt(i));
+                                        }
+                                    }
                                 }
                             }
                             else {
-                                subCommand += line[c];
+                                if (line[c] == " " || line[c] == "  " || endOfLine) {
+                                    if (endOfLine && c + 1 == line.length) {
+                                        subCommand += line[c];
+                                    }
+                                    if (subCommand.length != 0) {
+                                        command.push(subCommand);
+                                        subCommand = "";
+
+                                        commandName = command.join("");
+                                        commandInfo = game.vars.execution.instructions[commandName];
+                                        argumentID = 0;
+
+                                        if (! instructionNames.includes(commandName)) {
+                                            alert("Invalid instruction " + JSON.stringify(commandName) + " on line " + (parseInt(i) + 1) + ".");
+                                            return;
+                                        }
+                                    }
+                                }
+                                else {
+                                    subCommand += line[c];
+                                }
                             }
                             c++;
                         }
-
-                        if (command.length != 0) {
-                            commands.push(command);
-                            lineNumbers.push(parseInt(i));
-                        }
                     }
+
                     parsed.commands = commands;
                     parsed.lineNumbers = lineNumbers;
                     return parsed;
                 },
-                assembleCommands: program => { // Also validates
-                    let instructionNames = program.instructionSet.used;
+                assembleCommands: program => {
                     for (let i in program.commands) {
                         let command = program.commands[i];
                         let instructionName = command[0];
 
                         let compileConstant = instructionName == "#";
-                        if (compileConstant) { // Compile constants aren't dealt with yet but they are validated
-                            instructionName = "#" + command[1]; // It's in 2 parts
-                        }
-                        if (! instructionNames.includes(instructionName)) {
-                            alert("Invalid instruction " + JSON.stringify(instructionName) + " on line " + (program.lineNumbers[i] + 1) + ".");
-                            return;
-                        }
                         if (compileConstant) continue;
                     }
                 },
