@@ -47,21 +47,59 @@ let game = (_ => {
                         arguments: []
                     },
                     loadAccBit: {
-                        arguments: [memoryAddressLength, accAddressLength]
+                        arguments: [
+                            {
+                                type: "denary",
+                                convertTo: "binary",
+                                length: memoryAddressLength
+                            },
+                            {
+                                type: "denary",
+                                convertTo: "binary",
+                                length: accAddressLength
+                            }
+                        ]
                     },
                     jumpIf: {
-                        arguments: [memoryAddressLength, accAddressLength]
+                        arguments: [
+                            {
+                                type: "denary",
+                                convertTo: "binary",
+                                length: memoryAddressLength
+                            },
+                            {
+                                type: "denary",
+                                convertTo: "binary",
+                                length: accAddressLength
+                            }
+                        ]
                     },
                     saveAccBit: {
-                        arguments: [memoryAddressLength, accAddressLength]
+                        arguments: [
+                            {
+                                type: "denary",
+                                convertTo: "binary",
+                                length: memoryAddressLength
+                            },
+                            {
+                                type: "denary",
+                                convertTo: "binary",
+                                length: accAddressLength
+                            }
+                        ]
                     },
 
-                    // Compile constants
+                    // Compile commands
                     "#Pointer": {
-                        arguments: [-1]
-                    },
-                    "#InstructionSet": { // Doesn't do anything here
-                        arguments: [-1]
+                        arguments: [
+                            {
+                                type: "text"
+                            },
+                            {
+                                type: "denary",
+                                optional: true
+                            }
+                        ]
                     }
                 },
                 instructionSets: {
@@ -75,8 +113,7 @@ let game = (_ => {
                             "jumpIf",
                             "saveAccBit",
 
-                            "#Pointer",
-                            "#InstructionSet"
+                            "#Pointer"
                         ]
                     },
                     "1.1": {
@@ -89,8 +126,7 @@ let game = (_ => {
                             "jumpIf",
                             "saveAccBit",
 
-                            "#Pointer",
-                            "#InstructionSet"
+                            "#Pointer"
                         ]
                     }
                 },
@@ -133,13 +169,18 @@ let game = (_ => {
 
                     let lines = program.split("\n");
                     let commands = [];
-                    let lineNumbers = [];
                     let inMultiComment = false;
                     let commandName, commandInfo, argumentID;
+
+                    let inCompileCommand = false;
+                    let compileCommandInfo, compileCommandName, compileArgumentID;
+
                     let command = [];
-                    for (let i in lines) {
+                    let i = 1;
+                    while (i < lines.length) {
                         let line = lines[i];
-                        let inCompileCommand = false;
+                        let lineNumber = parseInt(i) + 1;
+
 
                         // Skip over whitespace
                         let c = 0;
@@ -154,103 +195,117 @@ let game = (_ => {
                                 if (nextTwo == "*/") {
                                     inMultiComment = false;
                                     c += 2;
+                                    continue;
                                 }
                             }
                             else {
                                 if (nextTwo == "/*") {
                                     inMultiComment = true;
                                     c += 2;
+                                    continue;
                                 }
                             }
 
                             if (inMultiComment || nextTwo == "//") {
-                                if (nextTwo == "//") {
+                                break;
+                            }
+                            let endOfLine = c + 1 >= line.length;
+                            if (line[c] == "#") {
+                                if (subCommand != "") {
+                                    command.push(subCommand);
+                                    subCommand = "";
+                                }
+                                command.push("#");
+
+                                if (inCompileCommand) {
+                                    if (command[0] == "#") { // Only run if this compile command isn't an argument
+                                        commandName = null;
+
+                                        commands.push(command);
+                                        command = [];
+                                    }
+                                    else {
+                                        argumentID++;
+                                    }
+                                    compileCommandName = null;
+                                    inCompileCommand = false;
                                     break;
                                 }
                                 else {
-                                    c++;
+                                    inCompileCommand = true;
                                 }
-                                continue;
-                            }
-                            if (line[c] == "#") {
-                                if (! inCompileCommand) {
-                                    command.push("#");
-                                }
-                                inCompileCommand = ! inCompileCommand;
                                 c++;
                                 continue;
                             }
 
-                            let endOfLine = c + 1 >= line.length;
-                            if (commandName) {
-                                let argumentLength = commandInfo.arguments[argumentID];
-                                if (typeof argumentLength == "function") {
-                                    argumentLength = argumentLength(parsed.instructionSet);
+                            if (inCompileCommand? compileCommandName : commandName) {
+                                let args = (inCompileCommand? compileCommandInfo : commandInfo).arguments;
+                                let argumentJSON = args[inCompileCommand? compileArgumentID : argumentID];
+                                let noArgs = args.length == 0;
+
+                                if (! noArgs) {
+                                    if (line[c] && ((! argumentJSON.hasOwnProperty("length")) || (line[c] != " " && line[c] != "    "))) {
+                                        subCommand += line[c];
+                                    }
                                 }
-
-                                if (argumentLength == -1) { // Text. Unknown length
-                                    if (endOfLine) {
-                                        argumentID++;
-                                        if (argumentID == commandInfo.arguments.length) {
-                                            commandName = null;
-
-                                            command = [];
-                                            commands.push(command);
-                                            lineNumbers.push(parseInt(i));
-                                        }
+                                if (endOfLine || noArgs) {
+                                    command.push(subCommand);
+                                    subCommand = "";
+                                    if (inCompileCommand) {
+                                        compileArgumentID++;
                                     }
                                     else {
-                                        subCommand += line[c];
-                                    }
-                                }
-                                else {
-                                    if (line[c] != " " && line[c] != "  ") {
-                                        subCommand += line[c];
-                                    }
-                                    if (subCommand.length == argumentLength) {
-                                        command.push(subCommand);
-                                        subCommand = "";
-
                                         argumentID++;
+
                                         if (argumentID == commandInfo.arguments.length) {
                                             commandName = null;
 
-                                            command = [];
                                             commands.push(command);
-                                            lineNumbers.push(parseInt(i));
+                                            command = [];
                                         }
                                     }
                                 }
                             }
                             else {
-                                if (line[c] == " " || line[c] == "  " || endOfLine) {
-                                    if (endOfLine && c + 1 == line.length) {
-                                        subCommand += line[c];
-                                    }
-                                    if (subCommand.length != 0) {
+                                let isSpace = line[c] == " " || line[c] == "    ";
+                                let firstSpace = isSpace && ((inCompileCommand && command[command.length - 1] == "#") || command.length == 0);
+                                if (line[c] && (! firstSpace)) {
+                                    subCommand += line[c];
+                                }
+                                if (endOfLine || firstSpace) {
+                                    if (subCommand) {
                                         command.push(subCommand);
                                         subCommand = "";
+                                    }
+                                    if (command.length != 0) {
+                                        let newCommandName = command[command.length - 1];
+                                        if (inCompileCommand) newCommandName = "#" + newCommandName;
 
-                                        commandName = command.join("");
-                                        commandInfo = game.vars.execution.instructions[commandName];
-                                        argumentID = 0;
+                                        let info = game.vars.execution.instructions[newCommandName];
+                                        if (inCompileCommand) {
+                                            compileCommandName = newCommandName;
+                                            compileCommandInfo = info;
+                                            compileArgumentID = 0;
+                                        }
+                                        else {
+                                            commandName = newCommandName;
+                                            commandInfo = info;
+                                            argumentID = 0;
+                                        }
 
-                                        if (! instructionNames.includes(commandName)) {
-                                            alert("Invalid instruction " + JSON.stringify(commandName) + " on line " + (parseInt(i) + 1) + ".");
+                                        if (! instructionNames.includes(newCommandName)) {
+                                            alert("Invalid instruction " + JSON.stringify(newCommandName) + " on line " + lineNumber + ".");
                                             return;
                                         }
                                     }
                                 }
-                                else {
-                                    subCommand += line[c];
-                                }
                             }
                             c++;
                         }
+                        i++;
                     }
 
                     parsed.commands = commands;
-                    parsed.lineNumbers = lineNumbers;
                     return parsed;
                 },
                 assembleCommands: program => {

@@ -1,4 +1,4 @@
-#InstructionSet 1.1
+#InstructionSet 1.1#
 /*
 This first version only supports 2 bit numbers
 
@@ -41,10 +41,11 @@ while (i != -1) {
 // Load the first number into the accumulator (both binary digits)
 // This is what will be the total
 loadAccBit
-0000 0000 0000 0000
+#Pointer Num1#
 0000
 loadAccBit
-0000 0000 0000 0000
+#Pointer Num1
+1#
 0001
 
 // Load the second number into the accumulator for faster read access
@@ -274,11 +275,16 @@ jumpIf
 
 stop
 
+#StartRaw#
+#Pointer Constants#
 // Constants
 01
 // Input numbers
+#Pointer Num1#
 01
+#Pointer Num2#
 01
 
 // Output value
 0
+#EndRaw#
