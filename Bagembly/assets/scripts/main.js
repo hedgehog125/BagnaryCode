@@ -44,7 +44,11 @@ let game = (_ => {
                 },
                 instructions: {
                     stop: {
-                        arguments: []
+                        arguments: [],
+                        map: instructionSet => {
+                            if (instructionSet.name == "1.0") return "0000";
+                            else return "00";
+                        }
                     },
                     loadAccBit: {
                         arguments: [
@@ -99,7 +103,21 @@ let game = (_ => {
                                 type: "denary",
                                 optional: true
                             }
-                        ]
+                        ],
+                        map: (instructionSet, arguments, compileCommandIsArg, temporary, temporaryForThisCommand, currentLength) => {
+                            if (compileCommandIsArg) return "0";
+                            else {
+                                if (! temporary.pointers) temporary.pointers = {};
+
+                                let name = arguments[0];
+                                if (temporary.pointers[name] == null) {
+                                    temporary.pointers[name] = currentLength;
+                                }
+                                else {
+                                    alert("Error: Pointer " + JSON.stringify(name) + " has already been defined.");
+                                }
+                            }
+                        }
                     }
                 },
                 instructionSets: {
@@ -134,8 +152,8 @@ let game = (_ => {
                 assembleProgram: program => {
                     let subFunctions = game.vars.execution;
                     program = subFunctions.parseProgram(program);
+                    subFunctions.checkSyntax(program);
                     let assembly = subFunctions.assembleCommands(program);
-                    assembly = subFunctions.compileConstants(program, assembly);
 
                     debugger
                     return assembly;
@@ -160,6 +178,7 @@ let game = (_ => {
                         let name = program.slice(index + keyword.length, end);
                         parsed.instructionSetName = name;
                         parsed.instructionSet = game.vars.execution.instructionSets[name];
+                        parsed.instructionSet.name = name;
                         if (parsed.instructionSet == null) {
                             alert("Invalid instruction set of " + JSON.stringify(name) + ".");
                             return;
@@ -281,21 +300,27 @@ let game = (_ => {
                                         let newCommandName = command[command.length - 1];
                                         if (inCompileCommand) newCommandName = "#" + newCommandName;
 
-                                        let info = game.vars.execution.instructions[newCommandName];
-                                        if (inCompileCommand) {
-                                            compileCommandName = newCommandName;
-                                            compileCommandInfo = info;
-                                            compileArgumentID = 0;
-                                        }
-                                        else {
-                                            commandName = newCommandName;
-                                            commandInfo = info;
-                                            argumentID = 0;
-                                        }
-
                                         if (! instructionNames.includes(newCommandName)) {
                                             alert("Invalid instruction " + JSON.stringify(newCommandName) + " on line " + lineNumber + ".");
                                             return;
+                                        }
+
+                                        let info = game.vars.execution.instructions[newCommandName];
+                                        if (info.arguments.length == 0) {
+                                            commands.push(command);
+                                            command = [];
+                                        }
+                                        else {
+                                            if (inCompileCommand) {
+                                                compileCommandName = newCommandName;
+                                                compileCommandInfo = info;
+                                                compileArgumentID = 0;
+                                            }
+                                            else {
+                                                commandName = newCommandName;
+                                                commandInfo = info;
+                                                argumentID = 0;
+                                            }
                                         }
                                     }
                                 }
@@ -308,17 +333,100 @@ let game = (_ => {
                     parsed.commands = commands;
                     return parsed;
                 },
+                checkSyntax: program => {
+                    // TODO
+                },
                 assembleCommands: program => {
+                    let generatedCode = [];
+                    let secondPassQueue = [];
+                    let temporary = {};
+
                     for (let i in program.commands) {
                         let command = program.commands[i];
-                        let instructionName = command[0];
+                        let temporaryForThisCommand = {};
 
-                        let compileConstant = instructionName == "#";
-                        if (compileConstant) continue;
+                        let output = game.vars.execution.assembleCommand(program.instructionSet, command, false, temporary, temporaryForThisCommand);
+                        let commandJSON = output[1];
+                        if (commandJSON.lateMap) {
+                            secondPassQueue.push([
+                                commandJSON.lateMap,
+                                temporaryForThisCommand,
+                                output[2], // Arguments
+                                output.length,
+                                generatedCode.length
+                            ]);
+                        }
+
+                        generatedCode.push(...output[0]);
                     }
-                },
-                compileConstants: (program, assembly) => { // Calculate the values of the compile constants
 
+                    for (let i of secondPassQueue) {
+                        let code = i[0];
+                        let output = code(program.instructionSet, i[1], i[2], temporary);
+
+                        if (output) {
+                            if (output.length != i[3]) {
+                                alert("Error: The length of code returned from lateMap must be the same as that instance returned from map.");
+                                return;
+                            }
+                            if (typeof output == "string") output = output.split("");
+                            else if (! Array.isArray(output)) {
+                                alert("Error: Wrong return type from lateMap.");
+                                return;
+                            }
+
+                            generatedCode.splice(i[4], output.length, ...output);
+                        }
+                    }
+
+                    return generatedCode.join("");
+                },
+                assembleCommand: (instructionSet, command, compileCommandIsArg, temporary, temporaryForThisCommand) => {
+                    let generatedCode = "";
+                    let isOuterCompileConstant = command[0] == "#";
+                    let instructionName = isOuterCompileConstant? "#" + command[1] : command[0];
+                    let commandJSON = game.vars.execution.instructions[instructionName];
+
+                    let arguments = [];
+                    let i = isOuterCompileConstant + 1;
+                    let argumentID = 0;
+                    while (i < command.length) {
+                        let argumentJSON = commandJSON.arguments[argumentID];
+
+                        let value = command[i];
+                        if (value == "#") {
+                            if (i == command.length - 1) break;
+                            let end = command.indexOf("#", i + 1);
+                            value = game.vars.execution.assembleCommand(instructionSet, command.slice(i, end + 1), true, temporary, temporaryForThisCommand)[0];
+                            i = end;
+                        }
+
+                        if (argumentJSON.convertTo == "binary") {
+                            let length = argumentJSON.length;
+                            if (typeof length == "function") length = length(instructionSet);
+                            value = game.vars.execution.denaryToBinary(parseInt(value), length);
+                        }
+                        arguments.push(value);
+
+                        i++;
+                        argumentID++;
+                    }
+
+                    if (commandJSON.map) {
+                        let output = commandJSON.map(instructionSet, arguments, compileCommandIsArg, temporary, temporaryForThisCommand, generatedCode.length);
+
+                        if (output != null) {
+                            if (typeof output != "string" && (! Array.isArray(output))) {
+                                alert("Error: Wrong return type for map.");
+                                return;
+                            }
+                            for (let c in output) {
+                                generatedCode += output[c];
+                            }
+                        }
+                    }
+
+                    return [generatedCode, commandJSON, arguments];
                 }
             }
         },
