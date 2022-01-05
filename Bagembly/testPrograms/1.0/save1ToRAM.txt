@@ -1,0 +1,19 @@
+#InstructionSet 1.1#
+
+// Load a 1 into the accumulator
+loadAccBit
+#Pointer Values#
+15
+
+// Write a 1 to RAM
+saveAccBit
+#Pointer Output#
+15
+
+stop
+
+#Pointer Values#
+#Raw 1#
+
+#Pointer Output#
+#Raw 0#

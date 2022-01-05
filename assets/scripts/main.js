@@ -72,13 +72,14 @@ let game = Bagel.init({
                     let state = executionVars.state;
                     let address = state.RAM.slice(register.programCounter + 2, register.programCounter + 18);
                     address = executionVars.binaryToDenary(address);
-                    let bitID = executionVars.binaryToDenary(state.RAM.slice(register.programCounter + 19, register.programCounter + 23));
+                    let bitID = executionVars.binaryToDenary(state.RAM.slice(register.programCounter + 18, register.programCounter + 22));
 
                     register.accumulator[bitID] = state.RAM[address];
                     register.programCounter += 16 + 4; // Skip over the values
                 },
                 "conditionalJumpToElse1.1": (executionVars, register) => { // Conditional jump to else continue
-                    let bitID = executionVars.binaryToDenary(state.RAM.slice(register.programCounter + 19, register.programCounter + 23));
+                    let state = executionVars.state;
+                    let bitID = executionVars.binaryToDenary(state.RAM.slice(register.programCounter + 18, register.programCounter + 22));
                     if (register.accumulator[bitID] == "0") {
                         register.programCounter += 16 + 4; // Skip over the values
                     }
@@ -91,7 +92,7 @@ let game = Bagel.init({
                 "writeAccumulatorBitRAM1.1": (executionVars, register) => { // Write accumulator bit to RAM
                     let state = executionVars.state;
                     let address = executionVars.binaryToDenary(state.RAM.slice(register.programCounter + 2, register.programCounter + 18));
-                    let bitID = executionVars.binaryToDenary(state.RAM.slice(register.programCounter + 19, register.programCounter + 23));
+                    let bitID = executionVars.binaryToDenary(state.RAM.slice(register.programCounter + 18, register.programCounter + 22));
                     executionVars.state.RAM[address] = register.accumulator[bitID];
                     register.programCounter += 16 + 4; // Skip over the value that stores the address and that stores the bit number
                 }
@@ -190,7 +191,7 @@ let game = Bagel.init({
             loadProgram: program => {
                 let state = game.vars.execution.state;
                 if (program.length > state.RAM.length) {
-                    alert("Program is too big.");
+                    alert("Program is too big. At least " + program.length + " bits of RAM are needed to store it. Try increasing the amount of RAM.");
                 }
 
                 for (let i in state.RAM) {
@@ -278,10 +279,11 @@ let game = Bagel.init({
                     address += length;
                 }
 
-                let debugDisplay = game.get.sprite("MemoryHistory").vars;
-                let instructionHistory = debugDisplay.instructionHistory;
+                let debugDisplay = game.get.sprite("MemoryHistory");
+                let instructionHistory = debugDisplay.vars.instructionHistory;
                 instructionHistory.push(line);
-                if (instructionHistory.length == debugDisplay.instructionHistoryLength + 1) {
+                let itemHeight = debugDisplay.height / (instructionHistory.length - 1);
+                if (instructionHistory.length > 1 && instructionHistory.length * itemHeight >= debugDisplay.vars.instructionHistoryMaxHeight) {
                     instructionHistory.splice(0, 1);
                 }
 
@@ -325,6 +327,9 @@ let game = Bagel.init({
                             let i = 0;
                             while (i < cycles) {
                                 game.vars.execution.tick();
+                                if (! game.vars.execution.state.running) {
+                                    break;
+                                }
                                 i++;
                             }
 
@@ -715,7 +720,7 @@ let game = Bagel.init({
                 size: 6,
                 vars: {
                     instructionHistory: [],
-                    instructionHistoryLength: 10,
+                    instructionHistoryMaxHeight: 115,
                     memoryHistory: []
                 },
                 scripts: {
@@ -764,7 +769,7 @@ let game = Bagel.init({
                                 text += register.accumulator.map((value, index) => index != 0 && index % 4 == 0? " " + value : value).join("");
 
                                 me.text = text;
-                                me.top = 380;
+                                me.bottom = 439;
                                 me.left = 599;
                             },
                             stateToRun: "main"

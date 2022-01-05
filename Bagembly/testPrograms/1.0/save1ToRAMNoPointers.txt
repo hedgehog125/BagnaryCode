@@ -1,0 +1,19 @@
+#InstructionSet 1.1#
+
+// Load a 1 into the accumulator
+loadAccBit
+46
+15
+
+// Write a 1 to RAM
+saveAccBit
+47
+15
+
+stop
+
+// Values
+#Raw 1#
+
+// Output
+#Raw 0#

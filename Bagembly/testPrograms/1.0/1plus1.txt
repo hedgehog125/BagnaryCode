@@ -309,17 +309,16 @@ saveAccBit
 
 stop
 
-#StartRaw#
-#Pointer Constants#
 // Constants
-01
+#Pointer Constants#
+#Raw 01#
+
 // Input numbers
 #Pointer Num1#
-01
+#Raw 01#
 #Pointer Num2#
-01
+#Raw 01#
 
 // Output value
 #Pointer Output#
-00
-#EndRaw#
+#Raw 00#
