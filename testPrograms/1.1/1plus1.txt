@@ -3,7 +3,7 @@
 // Constants
 01
 // Input
-11
-10
+01
+01
 // Output
 00
