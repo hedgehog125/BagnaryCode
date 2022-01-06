@@ -129,7 +129,7 @@ jumpIf
         // Check if carrying
         jumpIf
         #Pointer IfSecondBitCarrying_2#
-        3
+        2
         // Else
             // Replace this digit with a 1
             loadAccBit
@@ -243,7 +243,7 @@ jumpIf
         // Check if carrying
         jumpIf
         #Pointer IfFirstBitCarrying_2#
-        3
+        2
         // Else
             // Replace this digit with a 1
             loadAccBit
@@ -275,7 +275,7 @@ jumpIf
     // If it's 1
         // Check if not carrying, otherwise if carrying, jump to the next digit
         jumpIf
-        #Pointer JumpToProcessFirstDigit#
+        #Pointer JumpToFinish#
         2
         // Else
             // Replace this digit with a 0
@@ -291,7 +291,7 @@ jumpIf
 
             // Jump to next digit
             jumpIf
-            #Pointer JumpToProcessFirstDigit#
+            #Pointer JumpToFinish#
             3
 
 

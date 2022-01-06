@@ -413,21 +413,6 @@ let game = (_ => {
                     for (let i of secondPassQueue) {
                         let code = i[0].lateMap;
 
-                        let offset = 0;
-                        if (i[7]) {
-                            let argumentID = i[6];
-                            let parentCommandJSON = game.vars.execution.instructions[i[7]];
-
-                            if (! parentCommandJSON.arguments[argumentID].hasOwnProperty("binaryInsertOffset")) {
-                                alert("Error: Command " + JSON.stringify(i[7]) + " doesn't support binary insertion for argument " + argumentID + ".");
-                                return;
-                            }
-                            offset = parentCommandJSON.arguments[argumentID].binaryInsertOffset;
-                            if (typeof offset == "function") {
-                                offset = offset(program.instructionSet);
-                            }
-                        }
-                        if (i[4] == 440 || i[4] + offset == 440) debugger;
                         let output = code(program.instructionSet, temporary, i[1], i[2], i[5]);
 
                         if (output) {
@@ -437,7 +422,20 @@ let game = (_ => {
                             }
 
 
-                            // todo: offset was here
+                            let offset = 0;
+                            if (i[7]) {
+                                let argumentID = i[6];
+                                let parentCommandJSON = game.vars.execution.instructions[i[7]];
+
+                                if (! parentCommandJSON.arguments[argumentID].hasOwnProperty("binaryInsertOffset")) {
+                                    alert("Error: Command " + JSON.stringify(i[7]) + " doesn't support binary insertion for argument " + argumentID + ".");
+                                    return;
+                                }
+                                offset = parentCommandJSON.arguments[argumentID].binaryInsertOffset;
+                                if (typeof offset == "function") {
+                                    offset = offset(program.instructionSet);
+                                }
+                            }
 
                             generatedCode.splice(i[4] + offset, output.length, ...output);
                         }
