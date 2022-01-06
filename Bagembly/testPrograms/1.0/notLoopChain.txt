@@ -1,0 +1,76 @@
+#InstructionSet 1.1#
+
+// Load a 1 into the accumulator to use for non-conditional jumps
+loadAccBit
+#Pointer Constants
+1#
+1
+// Accumulator bit 0 is constant 0
+
+// Accumulator address 2 is the pixel value. Starting at 0
+
+#Pointer LoopStart#
+jumpIf
+#Pointer IfOne#
+2
+// Else
+    // Set it to 1
+    loadAccBit
+    #Pointer Constants#
+    2
+
+    // Non-conditional jump
+    jumpIf
+    #Pointer IfEnd#
+    1
+
+#Pointer IfOne#
+// If the value is 1
+    // Set it to 0
+    loadAccBit
+    #Pointer Constants#
+    2
+
+#Pointer IfEnd#
+
+
+saveAccBit
+#Pointer Pixels
+0#
+
+2
+// Set the pixels
+saveAccBit
+#Pointer Pixels
+1#
+2
+
+saveAccBit
+#Pointer Pixels
+2#
+2
+
+saveAccBit
+#Pointer Pixels
+3#
+2
+
+saveAccBit
+#Pointer Pixels
+4#
+2
+
+
+
+
+
+// Loop unconditionally
+jumpIf
+#Pointer LoopStart#
+1
+
+#Pointer Constants#
+#Raw 01#
+
+#Pointer Pixels#
+#Raw 00000#
