@@ -1,8 +1,7 @@
 /*
 TODO
 
-More instruction sets
-1.0 instruction set variation with 16 bit memory addresses
+RAM display when instruction set uses bytes
 Fix error when pausing and reloading while no program is loaded
 */
 
@@ -87,6 +86,12 @@ let game = Bagel.init({
 					let bitID = executionVars.binaryToDenary(state.RAM.slice(registers.programCounter + 18, registers.programCounter + 22));
 					executionVars.state.RAM[address] = registers.accumulator[bitID];
 					registers.programCounter += 16 + 4; // Skip over the value that stores the address and that stores the bit number
+				},
+
+				// V2
+				switchAccumulator: (executionVars, registers, instructionID) => {
+					const targetAccumulator = instructionID - 1;
+					console.log(targetAccumulator);
 				}
 			},
 			instructionInfo: { // Only used for the debug display
@@ -120,6 +125,12 @@ let game = Bagel.init({
 				"writeAccumulatorBitRAM1.1": {
 					name: "Write > RAM",
 					arguments: [16, 4]
+				},
+
+				// V2.0
+				switchAccumulator: {
+					name: "Switch accumulator",
+					arguments: []
 				}
 			},
 			instructionSets: {
@@ -151,9 +162,18 @@ let game = Bagel.init({
 				},
 				"2.0": {
 					mappings: [
-						"stop"
+						"stop",
+						"switchAccumulator",
+						"switchAccumulator",
+						"switchAccumulator",
+						"switchAccumulator",
+
 					],
 					instructionCodeLength: 1,
+					initRegisters: _ => ({
+						accumulators: new Uint8Array(4),
+						currentAccumulator: 0
+					}),
 					ramIsBytes: true
 				}
 			},
@@ -184,11 +204,18 @@ let game = Bagel.init({
 				}
 
 
-				const parsed = program.split("\n").map(value => (
+				const parsed = program.split("\r\n").join("\n").split("\n").map(value => (
 					value.replaceAll(" ", "").replaceAll("  ", "")
 				)).filter(value => (
 					! value.split("").some(character => ! "01".includes(character)) // Exlude lines that have something other than a 0 or a 1 in them
 				)).join("");
+				if (instructionSet.ramIsBytes) {
+					if (parsed.length % 8 != 0) {
+						alert("Program binary length must be a multiple of 8, as this instruction set uses bytes instead of bits.");
+						return;
+					}
+				}
+
 				return [parsed, name, instructionSet];
 			},
 			loadProgram: ([program, name, instructionSet]) => {
@@ -204,9 +231,17 @@ let game = Bagel.init({
 				config.instructionSet = instructionSet;
 				game.vars.execution.resetRAM();
 				
-				console.log("TODO: handle storing when is bytes. Also handle not multiple of 8")
-				for (let i in program) {
-					state.RAM[i] = program[i];
+				if (config.instructionSet.ramIsBytes) {
+					let c = 0;
+					for (let i = 0; i < program.length; i += 8) {
+						state.RAM[c] = program.slice(i, i + 8);
+						c++;
+					}
+				}
+				else {
+					for (let i in program) {
+						state.RAM[i] = program[i];
+					}
 				}
 			},
 			reloadProgram: _ => {
@@ -258,51 +293,54 @@ let game = Bagel.init({
 				let registers = state.registers;
 				registers.instruction = state.RAM.slice(registers.programCounter, registers.programCounter + config.instructionSet.instructionCodeLength).join("");
 
-				let instructionName = config.instructionSet.mappings[parseInt(registers.instruction, 2)];
+				const instructionID = parseInt(registers.instruction, 2);
+				const instructionName = config.instructionSet.mappings[instructionID];
 				if (instructionName == null) {
 					alert(`Invalid instruction ${registers.instruction} at address ${registers.programCounter}.`);
 					state.running = false;
 					return;
 				}
-				let code = executionVars.instructionCode[instructionName];
+				const code = executionVars.instructionCode[instructionName];
 				if (code == null) {
-					alert("Invalid instruction mapping for instruction set " + config.instructionSetName + " for code " + registers.instruction + ".");
+					alert(`Invalid instruction mapping for instruction set ${config.instructionSetName} for code ${registers.instruction}.`);
 					state.running = false;
 					return;
 				}
 
-				// For debugging
-				let address = registers.programCounter;
-				let line = address + ") ";
-				let instructionInfo = executionVars.instructionInfo[instructionName];
-				line += instructionInfo.name;
+				{ // For debugging
+					let address = registers.programCounter;
+					let line = address + ") ";
+					let instructionInfo = executionVars.instructionInfo[instructionName];
+					line += instructionInfo.name;
 
-				address += config.instructionSet.instructionCodeLength;
-				for (let i in instructionInfo.arguments) {
-					let length = instructionInfo.arguments[i];
-					let value = state.RAM.slice(address, address + length);
+					address += config.instructionSet.instructionCodeLength;
+					for (let i in instructionInfo.arguments) {
+						let length = instructionInfo.arguments[i];
+						let value = state.RAM.slice(address, address + length);
 
-					let c = 0;
-					while (c < value.length) {
-						if (c != 0 && c % 4 == 0) {
-							value[c - 1] += " ";
+						let c = 0;
+						while (c < value.length) {
+							if (c != 0 && c % 4 == 0) {
+								value[c - 1] += " ";
+							}
+							c++;
 						}
-						c++;
+
+						line += " | " + value.join("");
+						address += length;
 					}
 
-					line += " | " + value.join("");
-					address += length;
+					let debugDisplay = game.get.sprite("MemoryHistory");
+					let instructionHistory = debugDisplay.vars.instructionHistory;
+					instructionHistory.push(line);
+					let itemHeight = debugDisplay.height / (instructionHistory.length - 1);
+					if (instructionHistory.length > 1 && instructionHistory.length * itemHeight >= debugDisplay.vars.instructionHistoryMaxHeight) {
+						instructionHistory.splice(0, 1);
+					}
 				}
 
-				let debugDisplay = game.get.sprite("MemoryHistory");
-				let instructionHistory = debugDisplay.vars.instructionHistory;
-				instructionHistory.push(line);
-				let itemHeight = debugDisplay.height / (instructionHistory.length - 1);
-				if (instructionHistory.length > 1 && instructionHistory.length * itemHeight >= debugDisplay.vars.instructionHistoryMaxHeight) {
-					instructionHistory.splice(0, 1);
-				}
 
-				let output = code(executionVars, registers);
+				let output = code(executionVars, registers, instructionID);
 				if (! output) {
 					registers.programCounter += config.instructionSet.instructionCodeLength;
 				}

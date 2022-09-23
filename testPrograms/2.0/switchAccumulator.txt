@@ -1,0 +1,17 @@
+#InstructionSet 2.0
+
+Switch to first accumulator
+0000 0001
+
+Second
+0000 0010
+
+Third
+0000 0011
+
+Forth
+0000 0100
+
+
+Stop
+0000 0000
