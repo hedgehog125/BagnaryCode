@@ -1,0 +1,24 @@
+#InstructionSet 2.0
+
+Load 1 into accumulator 
+0000 0101
+0000 0001
+
+Again
+0000 0101
+0000 0001
+
+Add
+0001 0000
+
+Write result
+0001 1010
+0000 0000
+0000 1000
+
+Stop
+0000 0000
+
+
+Output
+0000 0000

@@ -1,8 +1,13 @@
 /*
 TODO
 
+Specify total argument length for each command, and increase the program counter by that rather than having to do it in the code manually
+Finish skip unless
+
+Handle joined accumulators
+Boolean and maths commands could work differently if the second value is the current one?
 RAM display when instruction set uses bytes
-Fix error when pausing and reloading while no program is loaded
+Some instructions should take more than a cycle, e.g load dynamic RAM and also based on arguments. Maybe only in 2.0?
 */
 
 const config = {
@@ -89,9 +94,172 @@ let game = Bagel.init({
 				},
 
 				// V2
-				switchAccumulator: (executionVars, registers, instructionID) => {
-					const targetAccumulator = instructionID - 1;
-					console.log(targetAccumulator);
+				switchAcc: (executionVars, registers, instructionID) => {
+					registers.currentAccumulator = instructionID - 1;
+					registers.currentAccumulatorByte = 0;
+				},
+				loadConst: (executionVars, registers) => {
+					const id = (registers.currentAccumulator * 2) + registers.currentAccumulatorByte;
+					registers.accumulators[id] = executionVars.state.RAM[registers.programCounter + 1];
+
+					executionVars.toggleAccumulatorByte();
+					registers.programCounter++;
+				},
+				loadRAM: (executionVars, registers) => {
+					const RAM = executionVars.state.RAM;
+
+					const id = (registers.currentAccumulator * 2) + registers.currentAccumulatorByte;
+					const address = (RAM[registers.programCounter + 1] * 256) + RAM[registers.programCounter + 2]; // The 2 bytes after the command
+					registers.accumulators[id] = RAM[address];
+
+					executionVars.toggleAccumulatorByte();
+					registers.programCounter += 2;
+				},
+				loadDynRAM: (executionVars, registers) => {
+					const RAM = executionVars.state.RAM;
+
+					const id = (registers.currentAccumulator * 2) + registers.currentAccumulatorByte;
+					const address = (RAM[registers.programCounter + 1] * 256) + RAM[registers.programCounter + 2]; // The 2 bytes after the command
+					registers.accumulators[id] = RAM[(RAM[address] * 256) + RAM[address + 1]];
+
+					executionVars.toggleAccumulatorByte();
+					registers.programCounter += 2;
+				},
+
+				copyAccBetween: (executionVars, registers, instructionID) => {
+					const target = instructionID - 8;
+					const id = (target * 2) + registers.currentAccumulatorByte;
+					registers.accumulators[id] = registers.accumulators[registers.currentAccumulator * 2];
+
+					executionVars.toggleAccumulatorByte();
+				},
+
+				not: (executionVars, registers) => {
+					const accumulators = registers.accumulators;
+
+					const id = registers.currentAccumulator * 2;
+					accumulators[id] = 255 - accumulators[id];
+
+					registers.currentAccumulatorByte = 0;
+				},
+				and: (executionVars, registers) => {
+					const accumulators = registers.accumulators;
+
+					const id = registers.currentAccumulator * 2;
+					accumulators[id] &= accumulators[id + 1];
+
+					registers.currentAccumulatorByte = 0;
+				},
+				or: (executionVars, registers) => {
+					const accumulators = registers.accumulators;
+					
+					const id = registers.currentAccumulator * 2;
+					accumulators[id] |= accumulators[id + 1];
+
+					registers.currentAccumulatorByte = 0;
+				},
+				xor: (executionVars, registers) => {
+					const accumulators = registers.accumulators;
+
+					const id = registers.currentAccumulator * 2;
+					accumulators[id] ^= accumulators[id + 1];
+
+					registers.currentAccumulatorByte = 0;
+				},
+
+				add: (executionVars, registers) => {
+					const accumulators = registers.accumulators;
+					const id = registers.currentAccumulator * 2;
+
+					accumulators[id] = accumulators[id] + accumulators[id + 1];
+
+					registers.currentAccumulatorByte = 0;
+				},
+				bitShift: (executionVars, registers) => {
+					const accumulators = registers.accumulators;
+					const id = registers.currentAccumulator * 2;
+
+					// Format of the bits: [0-1: Mode, 2: unused, 3: sign and 4-7: amount]
+					const mode = Math.floor(accumulators[id + 1] / 64); // First 2 bits
+					const amount = accumulators[id + 1] % 16; // Last 4 bytes
+					const isLeft = Math.floor((accumulators[id + 1] % 32) / 16) == 1; // The 5th byte from the last
+
+					let bits = accumulators[id].toString(2).split("");
+					for (let i = 0; i < amount; i++) {
+						let insertValue;
+						if (mode == 1) insertValue = "0";
+						else if (mode == 2) insertValue = "1";
+						
+						if (isLeft) {
+							if (mode == 0) insertValue = bits[0];
+							bits.splice(0, 1);
+							bits.push(insertValue);
+						}
+						else {
+							if (mode == 0) insertValue = bits[bits.length - 1];
+							bits.splice(0, 0, insertValue);
+							bits.pop();
+						}
+					}
+					accumulators[id] = parseInt(bits.join(""), 2);
+
+					registers.currentAccumulatorByte = 0;
+				},
+
+				joinAcc: (executionVars, registers, instructionID) => {
+					console.log("TODO");
+				},
+				unjoinAcc: (executionVars, registers, instructionID) => {
+					console.log("TODO");
+				},
+
+				skipUnless: (executionVars, registers) => {
+					if (registers.accumulators[registers.currentAccumulator * 2] % 2 == 0) {
+						registers.programCounter++; // TODO: look up number of arguments of next command and use that plus 1
+					}
+				},
+				jump: (executionVars, registers) => {
+					const RAM = executionVars.state.RAM;
+
+					const address = (RAM[registers.programCounter + 1] * 256) + RAM[registers.programCounter + 2];
+					registers.programCounter = address - 1; // Because of the increase after this command
+					// TODO: handle the automatic increase based on the arguments of this command
+				},
+				jumpDyn: (executionVars, registers) => {
+					const RAM = executionVars.state.RAM;
+
+					const address = (RAM[registers.programCounter + 1] * 256) + RAM[registers.programCounter + 2];
+					registers.programCounter = RAM[(RAM[address] * 256) + RAM[address + 1]] - 1; // -1 because of the increase after this command
+					// TODO: handle the automatic increase based on the arguments of this command
+				},
+				
+				writeConst: (executionVars, registers) => {
+					const RAM = executionVars.state.RAM;
+
+					const value = RAM[registers.programCounter + 1];
+					const address = (RAM[registers.programCounter + 2] * 256) + RAM[registers.programCounter + 3];
+					RAM[address] = value;
+
+					registers.programCounter += 3;
+				},
+				writeAcc: (executionVars, registers) => {
+					const RAM = executionVars.state.RAM;
+
+					const value = registers.accumulators[registers.currentAccumulator * 2];
+					const address = (RAM[registers.programCounter + 1] * 256) + RAM[registers.programCounter + 2];
+					RAM[address] = value;
+
+					registers.programCounter += 2;
+				},
+				writeAccDyn: (executionVars, registers) => {
+					const RAM = executionVars.state.RAM;
+
+					const value = registers.accumulators[registers.currentAccumulator * 2];
+					const indirectAddress = (RAM[registers.programCounter + 1] * 256) + RAM[registers.programCounter + 2];
+					const address = RAM[(RAM[indirectAddress] * 256) + RAM[indirectAddress + 1]];
+					RAM[address] = value;
+
+					registers.programCounter += 2;
 				}
 			},
 			instructionInfo: { // Only used for the debug display
@@ -128,9 +296,88 @@ let game = Bagel.init({
 				},
 
 				// V2.0
-				switchAccumulator: {
+				switchAcc: {
 					name: "Switch accumulator",
 					arguments: []
+				},
+
+				loadConst: {
+					name: "Load const",
+					arguments: [1]
+				},
+				loadRAM: {
+					name: "Load RAM",
+					arguments: [2]
+				},
+				loadDynRAM: {
+					name: "Load dynamic RAM",
+					arguments: [2]
+				},
+
+				copyAccBetween: {
+					name: "Copy accumulator > accumulator",
+					arguments: []
+				},
+
+				not: {
+					name: "Not",
+					arguments: []
+				},
+				and: {
+					name: "And",
+					arguments: []
+				},
+				or: {
+					name: "Or",
+					arguments: []
+				},
+				xor: {
+					name: "XOR",
+					arguments: []
+				},
+
+				add: {
+					name: "Add",
+					arguments: []
+				},
+				bitShift: {
+					name: "Bitshift",
+					arguments: []
+				},
+
+				joinAcc: {
+					name: "Join accumulators",
+					arguments: []
+				},
+				unjoinAcc: {
+					name: "Unjoin accumulators",
+					arguments: []
+				},
+
+				skipUnless: {
+					name: "Skip unless",
+					arguments: []
+				},
+				jump: {
+					name: "Jump",
+					arguments: [2]
+				},
+				jumpDyn: {
+					name: "Dynamic jump",
+					arguments: [2]
+				},
+
+				writeConst: {
+					name: "Write const > RAM",
+					arguments: [1, 2]
+				},
+				writeAcc: {
+					name: "Write accumulator > RAM",
+					arguments: [2]
+				},
+				writeDyn: {
+					name: "Write dynamic > RAM",
+					arguments: [2]
 				}
 			},
 			instructionSets: {
@@ -163,16 +410,48 @@ let game = Bagel.init({
 				"2.0": {
 					mappings: [
 						"stop",
-						"switchAccumulator",
-						"switchAccumulator",
-						"switchAccumulator",
-						"switchAccumulator",
 
+						"switchAcc",
+						"switchAcc",
+						"switchAcc",
+						"switchAcc",
+
+						"loadConst",
+						"loadRAM",
+						"loadDynRAM",
+
+						"copyAccBetween",
+						"copyAccBetween",
+						"copyAccBetween",
+						"copyAccBetween",
+
+						"not",
+						"and",
+						"or",
+						"xor",
+
+						"add",
+						"bitShift",
+
+						"joinAcc",
+						"joinAcc",
+						"unjoinAcc",
+						"unjoinAcc",
+
+						"skipUnless",
+						"jump",
+						"jumpDyn",
+						
+						"writeConst",
+						"writeAcc",
+						"writeAccDyn"
 					],
 					instructionCodeLength: 1,
 					initRegisters: _ => ({
-						accumulators: new Uint8Array(4),
-						currentAccumulator: 0
+						accumulators: new Uint8Array(8), // 2 values in 4 accumulators
+						currentAccumulator: 0,
+						currentAccumulatorByte: 0,
+						joinedAccumulators: [false, false]
 					}),
 					ramIsBytes: true
 				}
@@ -211,7 +490,7 @@ let game = Bagel.init({
 				)).join("");
 				if (instructionSet.ramIsBytes) {
 					if (parsed.length % 8 != 0) {
-						alert("Program binary length must be a multiple of 8, as this instruction set uses bytes instead of bits.");
+						alert(`Program binary length must be a multiple of 8, as this instruction set uses bytes instead of bits. It's ${parsed.length} bytes long.`);
 						return;
 					}
 				}
@@ -234,7 +513,7 @@ let game = Bagel.init({
 				if (config.instructionSet.ramIsBytes) {
 					let c = 0;
 					for (let i = 0; i < program.length; i += 8) {
-						state.RAM[c] = program.slice(i, i + 8);
+						state.RAM[c] = parseInt(program.slice(i, i + 8), 2);
 						c++;
 					}
 				}
@@ -245,7 +524,7 @@ let game = Bagel.init({
 				}
 			},
 			reloadProgram: _ => {
-				let execution = game.vars.execution;
+				const execution = game.vars.execution;
 				if (execution.program) {
 					execution.loadProgram(execution.program);
 				}
@@ -273,7 +552,10 @@ let game = Bagel.init({
 				};
 			},
 			beginExecution: _ => {
-				game.vars.execution.state.running = true;
+				const execution = game.vars.execution;
+				if (execution.program == null) return;
+
+				execution.state.running = true;
 				game.vars.executionTick = 1;
 
 				let pauseButton = game.game.sprites[15];
@@ -291,18 +573,33 @@ let game = Bagel.init({
 				let executionVars = game.vars.execution;
 				let state = executionVars.state;
 				let registers = state.registers;
-				registers.instruction = state.RAM.slice(registers.programCounter, registers.programCounter + config.instructionSet.instructionCodeLength).join("");
 
-				const instructionID = parseInt(registers.instruction, 2);
+				let instructionID;
+				if (config.instructionSet.ramIsBytes) {
+					registers.instruction = state.RAM.slice(
+						registers.programCounter, registers.programCounter + config.instructionSet.instructionCodeLength
+					).reduceRight((accumulator, current, index) => (
+						accumulator + (current * Math.pow(256, index))
+					), 0);
+					instructionID = registers.instruction;
+				}
+				else {
+					registers.instruction = state.RAM.slice(
+						registers.programCounter,
+						registers.programCounter + config.instructionSet.instructionCodeLength
+					).join("");
+					instructionID = parseInt(registers.instruction, 2);
+				}
+
 				const instructionName = config.instructionSet.mappings[instructionID];
 				if (instructionName == null) {
-					alert(`Invalid instruction ${registers.instruction} at address ${registers.programCounter}.`);
+					alert(`Invalid instruction ${registers.instruction} (ID: ${instructionID}) at address ${registers.programCounter}.`);
 					state.running = false;
 					return;
 				}
 				const code = executionVars.instructionCode[instructionName];
 				if (code == null) {
-					alert(`Invalid instruction mapping for instruction set ${config.instructionSetName} for code ${registers.instruction}.`);
+					alert(`Invalid instruction mapping for instruction set ${config.instructionSetName} for code ${registers.instruction} (ID: ${instructionID}).`);
 					state.running = false;
 					return;
 				}
@@ -344,6 +641,11 @@ let game = Bagel.init({
 				if (! output) {
 					registers.programCounter += config.instructionSet.instructionCodeLength;
 				}
+			},
+
+			toggleAccumulatorByte: _ => {
+				const registers = game.vars.execution.state.registers;
+				registers.currentAccumulatorByte = (registers.currentAccumulatorByte + 1) % 2;
 			}
 		},
 		executionTick: 0,
@@ -476,7 +778,10 @@ let game = Bagel.init({
 											contents = atob(contents);
 										}
 										let execution = game.vars.execution;
-										execution.loadProgram(execution.parseProgram(contents));
+
+										const parsed = execution.parseProgram(contents);
+										if (parsed == null) return;
+										execution.loadProgram(parsed);
 										execution.resetProgramCounter();
 										execution.resetRegisters();
 										execution.beginExecution();
