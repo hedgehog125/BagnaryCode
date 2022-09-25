@@ -1,0 +1,15 @@
+#InstructionSet 2.0#
+
+loadConst
+1
+loadConst
+1
+
+add
+writeAcc
+#Pointer Output#
+
+stop
+
+#Pointer Output#
+#Raw 0000 0000#

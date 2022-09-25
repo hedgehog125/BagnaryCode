@@ -1,12 +1,23 @@
 /*
 TODO
+
+Fix pointers for instruction sets with byte based RAM
+How's best to improve the bitshift command? It depends on the second value in the accumulator, so might need a command to set that value up? Or just some combination of raw and a new denary command? Compile time maths?
 Tidy up code
 Error checking
 */
 
 let game = (_ => {
-	let memoryAddressLength = instructionSet => instructionSet.memoryAddressLength;
-	let accAddressLength = instructionSet => instructionSet.accumulatorAddressLength;
+	const memoryAddressLength = instructionSet => instructionSet.memoryAddressLength;
+	const accAddressLength = instructionSet => instructionSet.accumulatorAddressLength;
+	const simpleCommand = code => ({
+		arguments: [],
+		map: _ => code
+	});
+	const simpleArgs = (code, args) => ({
+		arguments: args,
+		map: (_, args) => code + args.join("")
+	});
 
 	return Bagel.init({
 		id: "BagnaryCodeEmulator",
@@ -49,7 +60,8 @@ let game = (_ => {
 						arguments: [],
 						map: instructionSet => {
 							if (instructionSet.name == "1.0") return "0000";
-							else return "00";
+							else if (instructionSet.name == "1.1") return "00";
+							return "0".repeat(8);
 						}
 					},
 					loadAccBit: {
@@ -113,6 +125,93 @@ let game = (_ => {
 						}
 					},
 
+					// 2.0
+					switchAccA: simpleCommand("00000001"),
+					switchAccB: simpleCommand("00000010"),
+					switchAccC: simpleCommand("00000011"),
+					switchAccD: simpleCommand("00000100"),
+
+
+					loadConst: simpleArgs("00000101", [{
+						type: "denary",
+						convertTo: "binary",
+						length: 8,
+						binaryInsertOffset: 8
+					}]),
+					loadRAM: simpleArgs("00000110", [{
+						type: "denary",
+						convertTo: "binary",
+						length: 16,
+						binaryInsertOffset: 8
+					}]),
+					loadDynRAM: simpleArgs("00000111", [{
+						type: "denary",
+						convertTo: "binary",
+						length: 16,
+						binaryInsertOffset: 8
+					}]),
+
+					copyAccBetweenA: simpleCommand("00001000"),
+					copyAccBetweenB: simpleCommand("00001001"),
+					copyAccBetweenC: simpleCommand("00001010"),
+					copyAccBetweenD: simpleCommand("00001011"),
+
+
+					not: simpleCommand("00001100"),
+					and: simpleCommand("00001101"),
+					or: simpleCommand("00001110"),
+					xor: simpleCommand("00001111"),
+
+					add: simpleCommand("00010000"),
+					bitShift: simpleCommand("00010001"),
+
+					joinAccAB: simpleCommand("00010010"),
+					joinAccCD: simpleCommand("00010011"),
+
+					unjoinAccAB: simpleCommand("00010100"),
+					unjoinAccCD: simpleCommand("00010101"),
+
+					skipUnless: simpleCommand("00010110"),
+					jump: simpleArgs("00010111", [{
+						type: "denary",
+						convertTo: "binary",
+						length: 16,
+						binaryInsertOffset: 8
+					}]),
+					jumpDyn: simpleArgs("00011000", [{
+						type: "denary",
+						convertTo: "binary",
+						length: 16,
+						binaryInsertOffset: 8
+					}]),
+							
+					writeConst: simpleArgs("00011001", [
+						{
+							type: "denary",
+							convertTo: "binary",
+							length: 8,
+							binaryInsertOffset: 8
+						},
+						{
+							type: "denary",
+							convertTo: "binary",
+							length: 16,
+							binaryInsertOffset: 16
+						}
+					]),
+					writeAcc: simpleArgs("00011010", [{
+						type: "denary",
+						convertTo: "binary",
+						length: 16,
+						binaryInsertOffset: 8
+					}]),
+					writeAccDyn: simpleArgs("00011011", [{
+						type: "denary",
+						convertTo: "binary",
+						length: 16,
+						binaryInsertOffset: 8
+					}]),
+
 					// Compile commands
 					"#Pointer": {
 						arguments: [
@@ -162,7 +261,7 @@ let game = (_ => {
 							}
 						],
 						map: (instructionSet, arguments) => {
-							return arguments[0];
+							return arguments[0].split(" ").join("");
 						}
 					}
 				},
@@ -194,6 +293,43 @@ let game = (_ => {
 							"#Pointer",
 							"#Raw"
 						]
+					},
+					"2.0": {
+						instructionCodeLength: 8,
+						accumulatorAddressLength: null,
+						memoryAddressLength: 16,
+						used: [
+							"stop",
+							"switchAcc",
+
+							"loadConst",
+							"loadRAM",
+							"loadDynRAM",
+
+							"copyAccBetween",
+
+							"not",
+							"and",
+							"or",
+							"xor",
+
+							"add",
+							"bitShift",
+
+							"joinAcc",
+							"unjoinAcc",
+
+							"skipUnless",
+							"jump",
+							"jumpDyn",
+							
+							"writeConst",
+							"writeAcc",
+							"writeAccDyn",
+
+							"#Pointer",
+							"#Raw"
+						]
 					}
 				},
 
@@ -206,7 +342,19 @@ let game = (_ => {
 					return "#InstructionSet " + program.instructionSetName + "\n" + binary;
 				},
 				parseProgram: program => {
+					program = program.split("\r\n").join("\n");
 					let parsed = {};
+
+					const nextArgument = _ => {
+						argumentID++;
+
+						if (argumentID == commandInfo.arguments.length) {
+							commandName = null;
+
+							commands.push(command);
+							command = [];
+						}
+					};
 
 					// Find the instruction set specified in the file
 					let keyword = "#InstructionSet ";
@@ -261,7 +409,7 @@ let game = (_ => {
 
 						let subCommand = "";
 						while (c < line.length) {
-							let nextTwo = line[c] + line[c + 1];
+							let nextTwo = line.slice(c, c + 2); // This might be only 1 long if it's the end of the line
 							if (inMultiComment) {
 								if (nextTwo == "*/") {
 									inMultiComment = false;
@@ -287,9 +435,8 @@ let game = (_ => {
 									subCommand = "";
 
 									if (inCompileCommand) {
-										let commandName = "#" + command[command.lastIndexOf("#") + 1];
-										if (! instructionNames.includes(commandName)) {
-											alert("Invalid instruction " + JSON.stringify(commandName) + " on line " + lineNumber + ".");
+										if (! instructionNames.includes(compileCommandName)) {
+											alert(`Invalid instruction ${JSON.stringify(compileCommandName)} on line ${lineNumber}.`);
 											return;
 										}
 									}
@@ -304,7 +451,7 @@ let game = (_ => {
 										command = [];
 									}
 									else {
-										argumentID++;
+										nextArgument();
 									}
 									compileCommandName = null;
 									inCompileCommand = false;
@@ -334,14 +481,7 @@ let game = (_ => {
 										compileArgumentID++;
 									}
 									else {
-										argumentID++;
-
-										if (argumentID == commandInfo.arguments.length) {
-											commandName = null;
-
-											commands.push(command);
-											command = [];
-										}
+										nextArgument();
 									}
 								}
 							}
