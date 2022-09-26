@@ -1,7 +1,6 @@
 /*
 TODO
 
-Fix pointers for instruction sets with byte based RAM
 How's best to improve the bitshift command? It depends on the second value in the accumulator, so might need a command to set that value up? Or just some combination of raw and a new denary command? Compile time maths?
 Tidy up code
 Error checking
@@ -151,10 +150,10 @@ let game = (_ => {
 						binaryInsertOffset: 8
 					}]),
 
-					copyAccBetweenA: simpleCommand("00001000"),
-					copyAccBetweenB: simpleCommand("00001001"),
-					copyAccBetweenC: simpleCommand("00001010"),
-					copyAccBetweenD: simpleCommand("00001011"),
+					copyAccToA: simpleCommand("00001000"),
+					copyAccToB: simpleCommand("00001001"),
+					copyAccToC: simpleCommand("00001010"),
+					copyAccToD: simpleCommand("00001011"),
 
 
 					not: simpleCommand("00001100"),
@@ -247,6 +246,7 @@ let game = (_ => {
 								}
 								else {
 									let address = temporary.pointers[name];
+									if (instructionSet.ramIsBytes) address /= 8;
 									if (arguments[1]) address += arguments[1];
 
 									return game.vars.execution.denaryToBinary(address, instructionSet.memoryAddressLength);
@@ -270,6 +270,7 @@ let game = (_ => {
 						instructionCodeLength: 4,
 						accumulatorAddressLength: 3,
 						memoryAddressLength: 8,
+						ramIsBytes: false,
 						used: [
 							"stop",
 							"loadAccBit",
@@ -284,6 +285,7 @@ let game = (_ => {
 						instructionCodeLength: 2,
 						accumulatorAddressLength: 4,
 						memoryAddressLength: 16,
+						ramIsBytes: false,
 						used: [
 							"stop",
 							"loadAccBit",
@@ -298,6 +300,7 @@ let game = (_ => {
 						instructionCodeLength: 8,
 						accumulatorAddressLength: null,
 						memoryAddressLength: 16,
+						ramIsBytes: true,
 						used: [
 							"stop",
 							"switchAcc",
@@ -306,7 +309,7 @@ let game = (_ => {
 							"loadRAM",
 							"loadDynRAM",
 
-							"copyAccBetween",
+							"copyAccTo",
 
 							"not",
 							"and",
