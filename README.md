@@ -1,5 +1,5 @@
 # BagnaryCode
-Bagel Binary Code. Not really anything to do with Bagel.js, I just felt like naming it after it. It's a really basic CPU architecture and emulator
+Bagel Binary Code. It's a really basic CPU architecture for a hypothetical CPU and an emulator for it.
 
 Version 1.0 of the architecture is really basic and only supports 4 instructions:
 * Stop (0000)
@@ -21,7 +21,6 @@ A few things to note: <br>
 * Instruction set 1.0 uses 8 bit memory addresses and has a 8 bit accumulator.
 * 1.1 uses 16 bits for both.
 * Addresses target a bit instead of a byte
-* (this is emulating a CPU that doesn't actually exist. It's hypothetical for now)
 
 # Getting started
 Run the emulator in your browser here: https://hedgehog125.github.io/BagnaryCode
